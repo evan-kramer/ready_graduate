@@ -10,7 +10,7 @@ library(haven)
 library(RJDBC)
 setwd("N:/")
 
-data = T
+data = F
 ap = F
 cie = F
 clep = F
@@ -18,9 +18,10 @@ de = F
 ib = F
 ic = F
 ldc = F
-sdc = T
-compile = T
+sdc = F
+compile = F
 output = T
+checks = F
 
 # Data
 if(data) {
@@ -679,102 +680,21 @@ if(sdc) {
     # 2018-19
     read_dta(str_c(getwd(), "Assessment_Data Returns/Statewide Dual Credit Challenge/", 
                    year(today()) - 1, "-", str_sub(year(today()), -2, -1), 
-                   "/20190124_SDC_Exam_Score_Fall_SY2018-2019_Whalen_v1.dta")) %>% 
+                   "/20190206_SDC_Exam_Score_Fall_SY2018-2019_Whalen_v2.dta")) %>% 
       janitor::clean_names() %>% 
       transmute(course_code, student_id, exam_score, exam_cut_score, exam_result)
   )
-  enrollments = as.tbl(dbGetQuery(con, str_c(
-    "select courses.isp_id, courses.student_key, courses.type_of_service, courses.first_name, courses.middle_name, courses.last_name,    
-    courses.date_of_birth, courses.isp_school_year, courses.withdrawal_reason, courses.begin_date, courses.end_date,
-    courses.sca_school_year, courses.sca_begin_date, courses.sca_end_date, courses.cs_school_year, 
-    courses.sca_local_class_number, courses.course_code, courses.cs_begin_date, courses.cs_end_date, courses.state_dual_credit,
-    courses.local_dual_credit, courses.dual_enrollment, courses.school_bu_id, 
-    instructional_days.district_no, instructional_days.school_no, instructional_days.id_date
-    from (
-    select distinct student_key
-    from studentcohortdata_historic
-    where cohortyear = ", year(today()) - 5, " and included_in_cohort = 'Y'
-    ) cohort
-    left outer join (
-    select isp.isp_id, isp.student_key, isp.type_of_service, isp.first_name, isp.middle_name, isp.last_name,    
-    isp.date_of_birth, isp.school_year as isp_school_year, isp.withdrawal_reason, isp.begin_date, isp.end_date,
-    sca.school_year as sca_school_year, sca.sca_begin_date, sca.sca_end_date, cs.school_year as cs_school_year, 
-    sca.local_class_number as sca_local_class_number, course_code, cs_begin_date, cs_end_date, state_dual_credit,
-    local_dual_credit, dual_enrollment, isp.school_bu_id
-    from instructional_service_period isp
-    join student_class_assignment sca on sca.isp_id = isp.isp_id
-    join class_section cs on 
-    sca.instructional_program_num = cs.instructional_program_num and
-    sca.local_class_number = cs.local_class_number and 
-    sca.school_bu_id = cs.school_bu_id and 
-    sca.school_year = cs.school_year
-    --where cs.course_code in (", str_flatten(course_codes, ","), ") and state_dual_credit = 'Y' 
-    where state_dual_credit = 'Y'
-    ) courses on courses.student_key = cohort.student_key
-    left outer join (
-    select school_year, s.school_bu_id, s.district_no, s.school_no, sid.id_date
-    from scal_id_days sid
-    join school s on s.school_bu_id = sid.school_bu_id
-    where school_year >= extract(year from sysdate) - 4
-    ) instructional_days
-    on (
-    courses.school_bu_id = instructional_days.school_bu_id and
-    courses.isp_school_year = instructional_days.school_year
-    )"
-  ))) %>%
-    janitor::clean_names() %>% 
-    # Create instructional day variables
-    mutate(cs_end_date = if_else(is.na(cs_end_date), sca_end_date, cs_end_date),
-           course_instructional_days = as.numeric(id_date >= cs_begin_date & id_date <= cs_end_date),
-           enrolled_instructional_days = as.numeric(id_date >= sca_begin_date & id_date <= sca_end_date)) %>% 
-    arrange(isp_id, student_key) %>%
-    group_by(isp_id, student_key, course_code, begin_date, end_date, sca_begin_date, sca_end_date,
-             cs_begin_date, cs_end_date) %>%
-    # SUm course and enrolled instructional days by course code, all begin and end dates
-    summarize(first_name = first(first_name), middle_name = first(middle_name), last_name = first(last_name),
-              date_of_birth = first(date_of_birth), type_of_service = first(type_of_service),
-              isp_school_year = first(isp_school_year), withdrawal_reason = first(withdrawal_reason),
-              sca_school_year = first(sca_school_year), cs_school_year = first(cs_school_year),
-              sca_local_class_number = first(sca_local_class_number), state_dual_credit = first(state_dual_credit),
-              local_dual_credit = first(local_dual_credit), dual_enrollment = first(dual_enrollment),
-              course_instructional_days = sum(course_instructional_days, na.rm = T),
-              enrolled_instructional_days = sum(enrolled_instructional_days, na.rm = T)) %>%
-    ungroup()
   
   # EPSO counts
   SDC = filter(cohort, included_in_cohort == "Y") %>% 
     # Start with the cohort
     select(student_key) %>%
-    # Join to enrollments
-    left_join(enrollments, by = "student_key") %>% # 127211 observations
-    # Remove students in the cohort with no AP enrollments
-    filter(!is.na(isp_id)) %>% # 81213 observations
-    # Must not be withdrawn
-    filter(is.na(withdrawal_reason)) %>% # 80152 observations
-    # Remove if enrollment end_date is after course assignment end date
-    filter(is.na(end_date) | ymd_hms(end_date) <= ymd_hms(sca_end_date)) %>% # same
-    # Take latest enrollment end, begin, course assignment end, begin, class section end, begin
-    arrange(student_key, course_code, desc(is.na(end_date)), desc(end_date), desc(begin_date), 
-            desc(is.na(sca_end_date)), desc(sca_end_date), desc(sca_begin_date), 
-            desc(is.na(cs_end_date)), desc(cs_end_date), desc(cs_begin_date)) %>%
-    group_by(student_key, course_code) %>%
-    
-    # Summarize by student and course code
-    summarize(first_name = first(first_name), middle_name = first(middle_name), last_name = first(last_name),
-              isp_school_year = first(isp_school_year),
-              enrolled_instructional_days = sum(enrolled_instructional_days, na.rm = T),
-              course_instructional_days = max(course_instructional_days, na.rm = T)) %>% #  observations
-    ungroup() %>%
-    # Remove students enrolled for less than half the course
-    filter(enrolled_instructional_days / course_instructional_days >= 0.5) %>% #  observations
+    # Just join to exams, ignore enrollments (must be enrolled to be tested)
+    left_join(exams, by = c("student_key" = "student_id")) %>% # observations
     # Join course names from correlation
     left_join(group_by(mutate(cc, course_code = as.numeric(`Course Code`)), course_code) %>%
                 summarize(course_title = first(`Course Title`)),
               by = "course_code") %>%
-    # Join to exam data -- only keep if course and test match
-    left_join(transmute(xw, course_code, exam_name), by = "course_code") %>% # observations
-    left_join(exams,
-              by = c("student_key" = "student_id", "course_code")) %>% # observations
     # Remove students who do not have a valid performance level
     filter(!is.na(exam_score)) %>%
     # Collapse to student_level count
@@ -814,8 +734,10 @@ if(compile) {
     # Merge ACT and SAT data
     left_join(read_dta(str_c("N:/ORP_accountability/data/", year(today()) - 1, "_ACT/Post-Appeals/", year(today()), 
                              "_ACT_student_level_actcohorthighest_appeals.dta")) %>% 
+                arrange(student_key, desc(act_composite_highest), desc(act_math_highest), desc(act_reading_highest),
+                        desc(act_english_highest), act_science_highest) %>%
                 group_by(student_key) %>% 
-                summarize_at(vars(ends_with("_highest"), sat_total), funs(max(., na.rm = T))), by = "student_key")  
+                summarize_at(vars(ends_with("_highest"), sat_total), funs(first(.))), by = "student_key") 
 } else {
   rm(compile)
 }
