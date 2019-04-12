@@ -1,6 +1,6 @@
 # Ready Graduate Data Pull
 # Evan Kramer
-# 4/11/2019
+# 4/12/2019
 
 options(java.parameters = "-Xmx16G")
 library(tidyverse)
@@ -83,45 +83,15 @@ read_csv("N:/ORP_accountability/data/2018_final_accountability_files/system_name
   ungroup() %>%
   write_csv(str_c(getwd(), "/Documentation for Reviewers/Status Updates/status_update_", today(), ".csv"), na = "")
 
-
-break
-
-# Output student-level file for sending emails
-# wb = str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")
-openxlsx::writeDataTable(
-  wb = openxlsx::loadWorkbook(str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")),
-  sheet = 3,
-  x = select(rg, student_key, system, school, n_docs_to_review:n_new_data, status, comments),
-  rowNames = F
-)
-
-
-
-# Look at archives
-archive = temp = tibble()
-setwd("//ca01sdcww00004/inetpub/wwwroot/Cohort/App_Data/RG")
-for(f in sort(list.files())) {
-  for(f2 in list.files(f)) {
-    if(str_detect(f2, ".csv")) {
-      temp = read_csv(str_c(f, "/", f2)) %>% 
-        mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
-    } else if(str_detect(f2, ".xlsx")) {
-      temp = readxl::read_excel(str_c(f, "/", f2)) %>% 
-        mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
-    }
-    archive = bind_rows(archive, temp)
-  }
-}
-
-rm(list = ls(pattern = "f")); rm(temp)
-(archive)
-setwd(str_c("N:/ORP_accountability/projects/", year(today()), "_ready_graduate/"))
-
-
-
 # Make database updates
-for(i in sort(unique(rg$student_key))) {
-  if(rg$n_data_no_doc[rg$student_key == i]) {
+dbSendUpdate(
+  con,
+  "update student_readygrad_docs
+  set comments = NULL 
+  where status is null and comments is not null"
+)
+for(i in sort(unique(updates$student_key))) {
+  if(updates$n_data_no_doc[updates$student_key == i]) {
     # No documentation
     dbSendUpdate(
       con,
@@ -132,7 +102,7 @@ for(i in sort(unique(rg$student_key))) {
       ) 
     )
     # dbCommit(con)
-  } else if(rg$n_doc_no_data[rg$student_key == i]) {
+  } else if(updates$n_doc_no_data[updates$student_key == i]) {
     # No data    
     dbSendUpdate(
       con,
@@ -146,7 +116,34 @@ for(i in sort(unique(rg$student_key))) {
   } 
 }
 
-# If data are different from prior data pull, re-review
-# Students with documentation uploaded but no data
-# If there is only documentation but no data (or vice versa), automatically deny with a status of 
-# "documentation was uploaded but no data (or vice versa)"
+# Output student-level file for sending emails
+# wb = str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")
+openxlsx::writeDataTable(
+  wb = openxlsx::loadWorkbook(str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")),
+  sheet = 3,
+  x = select(updates, student_key, ends_with("_no"), n_docs_to_review:n_new_data, status, comments),
+  rowNames = F
+)
+
+# Look at archives
+archive = temp = tibble()
+setwd("//ca01sdcww00004/inetpub/wwwroot/Cohort/App_Data/RG")
+for(f in sort(list.files())) {
+  for(f2 in list.files(f)) {
+    if(str_detect(f2, ".csv")) {
+      temp = read_csv(str_c(f, "/", f2)) %>% 
+        mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
+    } else if(str_detect(f2, ".xlsx")) {
+      temp = readxl::read_excel(str_c(f, "/", f2)) %>% 
+        mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
+    }
+    if("UPLOAD_DATE" %in% names(temp)) {
+      temp = mutate(temp, UPLOAD_DATE = as_datetime(UPLOAD_DATE))
+    }
+    archive = bind_rows(archive, temp)
+  }
+}
+
+rm(list = ls(pattern = "f")); rm(temp)
+(archive)
+setwd(str_c("N:/ORP_accountability/projects/", year(today()), "_ready_graduate/"))
