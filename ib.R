@@ -10,9 +10,10 @@ library(RJDBC)
 setwd("N:/")
 
 # Switches
-data = F
-clean = F
+data = T
+clean = T
 compile = F
+check = F
 domain = "ib"
 
 # Load data and connect to database
@@ -146,8 +147,7 @@ if(clean == T) {
     # Collapse to student_level count of courses
     group_by(student_key) %>% 
     summarize(epso_type = domain, n_courses = n_distinct(course_code)) %>% # 12932 observations
-    ungroup()
-
+    ungroup() 
 } else {
   rm(clean)
 }
@@ -174,4 +174,17 @@ if(compile == T) {
   write_csv(c, str_c(path, file), na = "")
 } else {
   rm(compile)
+}
+
+# Checks
+if(check) {
+  hamilton = readxl::read_excel("C:/Users/CA19130/Downloads/Copy of HCS_IB records class of 2018.xlsx") %>%
+    janitor::clean_names() 
+  left_join(
+    hamilton, 
+    filter(exams, student_id %in% hamilton$student_key),
+    by = c("student_key" = "student_id")
+  )
+} else {
+  rm(check)
 }
