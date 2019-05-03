@@ -1,5 +1,5 @@
 # Ready Graduate - CIE
-# 12/21/2018
+# 5/2/2019
 
 options(java.parameters = "-Xmx16G")
 library(tidyverse)
@@ -11,7 +11,7 @@ setwd("N:/")
 # Switches
 data = T
 clean = T
-compile = T
+compile = F
 domain = "cie"
 
 # Load data and connect to database
@@ -82,10 +82,16 @@ if(data == T) {
     )"
   ))) %>% 
     janitor::clean_names() %>% 
-    # Create instructional day variables
-    mutate(cs_end_date = ifelse(is.na(cs_end_date), sca_end_date, cs_end_date),
-           course_instructional_days = as.numeric(id_date >= cs_begin_date & id_date <= cs_end_date),
-           enrolled_instructional_days = as.numeric(id_date >= sca_begin_date & id_date <= sca_end_date)) %>% 
+    mutate(
+      # Account for missing end dates
+      max_id_date = max(id_date, na.rm = T),
+      # Create instructional day variables
+      cs_end_date = ifelse(!is.na(cs_end_date), cs_end_date, 
+                           ifelse(!is.na(sca_end_date), sca_end_date, max_id_date)), 
+      sca_end_date = ifelse(!is.na(sca_end_date), sca_end_date, max_id_date),
+      course_instructional_days = as.numeric(id_date >= cs_begin_date & id_date <= cs_end_date),
+      enrolled_instructional_days = as.numeric(id_date >= sca_begin_date & id_date <= sca_end_date)
+    ) %>%
     arrange(isp_id, student_key) %>%
     group_by(isp_id, student_key, course_code, begin_date, end_date, sca_begin_date, sca_end_date,
              cs_begin_date, cs_end_date) %>%

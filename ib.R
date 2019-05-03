@@ -1,6 +1,6 @@
 # Ready Graduate - IB
 # Evan Kramer
-# 10/29/2018
+# 5/2/2019
 
 options(java.parameters = "-Xmx16G")
 library(tidyverse)
@@ -12,7 +12,7 @@ setwd("N:/")
 # Switches
 data = T
 clean = T
-compile = F
+compile = T
 check = F
 domain = "ib"
 
@@ -82,14 +82,21 @@ if(data == T) {
     )"
   ))) %>% 
     janitor::clean_names() %>% 
-    # Create instructional day variables
-    mutate(cs_end_date = ifelse(is.na(cs_end_date), sca_end_date, cs_end_date),
-           course_instructional_days = as.numeric(id_date >= cs_begin_date & id_date <= cs_end_date),
-           enrolled_instructional_days = as.numeric(id_date >= sca_begin_date & id_date <= sca_end_date)) %>% 
+    group_by(isp_school_year, course_code) %>%
+    mutate(
+      # Account for missing end dates
+      max_id_date = max(id_date, na.rm = T),
+      # Create instructional day variables
+      cs_end_date = ifelse(!is.na(cs_end_date), cs_end_date, 
+                           ifelse(!is.na(sca_end_date), sca_end_date, max_id_date)), 
+      sca_end_date = ifelse(!is.na(sca_end_date), sca_end_date, max_id_date),
+      course_instructional_days = as.numeric(id_date >= cs_begin_date & id_date <= cs_end_date),
+      enrolled_instructional_days = as.numeric(id_date >= sca_begin_date & id_date <= sca_end_date)
+    ) %>% 
     arrange(isp_id, student_key) %>%
     group_by(isp_id, student_key, course_code, begin_date, end_date, sca_begin_date, sca_end_date,
              cs_begin_date, cs_end_date) %>%
-    # SUm course and enrolled instructional days by course code, all begin and end dates
+    # Sum course and enrolled instructional days by course code, all begin and end dates
     summarize(first_name = first(first_name), middle_name = first(middle_name), last_name = first(last_name),
               date_of_birth = first(date_of_birth), type_of_service = first(type_of_service),
               isp_school_year = first(isp_school_year), withdrawal_reason = first(withdrawal_reason),
@@ -99,7 +106,6 @@ if(data == T) {
               course_instructional_days = sum(course_instructional_days, na.rm = T),
               enrolled_instructional_days = sum(enrolled_instructional_days, na.rm = T)) %>%
     ungroup()
-  
 } else {
   rm(data)
 }
@@ -123,6 +129,7 @@ if(clean == T) {
             desc(is.na(sca_end_date)), desc(sca_end_date), desc(sca_begin_date), 
             desc(is.na(cs_end_date)), desc(cs_end_date), desc(cs_begin_date)) %>%
     group_by(student_key, course_code) %>%
+    arrange(begin_date, end_date, sca_begin_date, sca_end_date, cs_begin_date, cs_end_date) %>% 
     # Summarize by student and course code
     summarize(first_name = first(first_name), middle_name = first(middle_name), last_name = first(last_name),
               isp_school_year = first(isp_school_year), 
@@ -147,7 +154,7 @@ if(clean == T) {
     # Collapse to student_level count of courses
     group_by(student_key) %>% 
     summarize(epso_type = domain, n_courses = n_distinct(course_code)) %>% # 12932 observations
-    ungroup() 
+    ungroup() #%>% filter(student_key == 3073966)
 } else {
   rm(clean)
 }
@@ -178,6 +185,28 @@ if(compile == T) {
 
 # Checks
 if(check) {
+  # Missing sca_end_dates
+  full_join(
+    c,
+    read_csv(
+      str_c(
+        "ORP_accountability/projects/",
+        year(now()),
+        "_ready_graduate/Data/",
+        domain, 
+        "_student_level.csv"
+      )
+    ), 
+    by = c("student_key", "epso_type")
+  ) %>% 
+    mutate_at(vars(starts_with("n_courses")), funs(ifelse(is.na(.), 0, .))) %>% 
+    mutate(diff = n_courses.x - n_courses.y) %>% 
+    group_by(diff) %>% 
+    summarize(n = n()) %>% 
+    ungroup() %>% 
+    mutate(pct = round(100 * n / sum(n), 1))
+  
+  # Hamilton County
   hamilton = readxl::read_excel("C:/Users/CA19130/Downloads/Copy of HCS_IB records class of 2018.xlsx") %>%
     janitor::clean_names() 
   left_join(

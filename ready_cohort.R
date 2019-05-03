@@ -10,16 +10,16 @@ library(haven)
 library(RJDBC)
 setwd("N:/")
 
-data = F
-ap = F
-cie = F
-clep = F
-de = F
-ib = F
-ic = F
-ldc = F
-sdc = F
-compile = F
+data = T
+ap = T
+cie = T
+clep = T
+de = T
+ib = T
+ic = T
+ldc = T
+sdc = T
+compile = T
 output = T
 checks = F
 
