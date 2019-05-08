@@ -98,7 +98,7 @@ for(i in sort(unique(updates$student_key))) {
       str_c(
         "update student_readygrad_docs ",
         "set comments = 'No documentation has been uploaded for this appeal. Please upload documentation by clicking the Attach link or using the Mass Upload feature.' ",
-        "where student_key = ", i
+        "where status in (0, 2, NULL) and student_key = ", i
       ) 
     )
     # dbCommit(con)
@@ -109,7 +109,7 @@ for(i in sort(unique(updates$student_key))) {
       str_c(
         "update student_readygrad_docs ",
         "set comments = 'No data has been uploaded for this appeal. Please upload updated data using the Mass Upload feature.' ",
-        "where student_key = ", i
+        "where status in (0, 2, NULL) and student_key = ", i
       ) 
     )
     # dbCommit(con)

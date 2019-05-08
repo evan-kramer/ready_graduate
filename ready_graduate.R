@@ -10,9 +10,10 @@ library(haven)
 library(RJDBC)
 setwd(str_c("N:/ORP_accountability/projects/", year(today()), "_ready_graduate/Data/"))
 
-data = T
+data = F
 output = F
 checks = F
+final_output = T
 domain = "ready_graduate"
 
 # Load data
@@ -85,21 +86,6 @@ if(output) {
   path = str_c(getwd(), "/")
   file = str_c(domain, "_student_level.csv")
   
-  rg_out = select(rg, student_key, n_sdc, ready_graduate) %>% 
-    full_join(
-      dbGetQuery(
-        con,
-        "select * 
-        from student_ready_grads"
-      ) %>% 
-        janitor::clean_names(), 
-      by = "student_key"
-    ) %>% 
-    mutate(n_statewide_dual_credit = pmax(n_sdc, n_statewide_dual_credit),
-           ready_graduate = ifelse(ready_graduate.x == "Y" | ready_graduate.y == "Y", "Y", ready_graduate.x)) %>% 
-    select(-n_sdc, -contains("."), -is_approved)
-  names(rg_out) = names(rg)
-  
   if(file %in% list.files(path)) {
     if(!dir.exists(str_c(path, "Previous"))) {
       dir.create(str_c(path, "Previous"))
@@ -111,33 +97,51 @@ if(output) {
     file.rename(str_c(path, file),
                 str_c(path, "Previous/", str_replace_all(now(), "[-:]", ""), "/", file))
   }
-  write_csv(rg_out, str_c(path, file), na = "")  
+  write_csv(rg, str_c(path, file), na = "")  
 } else {
   rm(output)
 }
 
 # Checks
 if(checks) {
-  # Confirm that RG business rules are applied correctly
-  rg = as.tbl(
+  # Missing sca_end_date
+  # Current file (from database)
+  sca_na = as.tbl(
     dbGetQuery(
-      eis_con,
+      con,
       "select *
       from student_ready_grads"
     )
   ) %>% 
-    janitor::clean_names()
+    janitor::clean_names() %>% 
+    select(student_key, n_cambridge, n_ap = n_adv_placement, n_ib = n_inter_baccalaureate, n_de = n_dual_enrollment,
+           n_sdc = n_statewide_dual_credit, n_ldc = n_local_dual_credit, ready_graduate) %>% 
+    full_join(rg, by = "student_key")
   
-  mutate_at(rg, vars(sat_math:participate_clg_lvl_pgm), funs(ifelse(is.na(.), 0, .))) %>% 
-    mutate(should_be_rg = ifelse(sat_total >= 1060 | act_composite >= 21 | 
-                                   industry_cert_earned + n_cambridge + n_adv_placement + 
-                                   n_inter_baccalaureate + n_statewide_dual_credit + 
-                                   n_local_dual_credit + n_dual_enrollment + participate_clg_lvl_pgm >= 4 | 
-                                   (asvab >= 31 & industry_cert_earned + n_cambridge + n_adv_placement + 
-                                      n_inter_baccalaureate + n_statewide_dual_credit + 
-                                      n_local_dual_credit + n_dual_enrollment + participate_clg_lvl_pgm >= 2), "Y", "N"), 
-         is_rg = ready_graduate) %>% 
-    filter(should_be_rg == "Y" & is_rg == "N") %>%
+  for(v in c("n_cambridge", "n_ap", "n_ib", "n_sdc", "n_ldc", "ready_graduate")) {
+    print(v)
+    print(
+      sum(
+        sca_na[, str_c(v, ".x")] != sca_na[, str_c(v, ".y")] | 
+          (is.na(sca_na[, str_c(v, ".x")]) & !is.na(sca_na[, str_c(v, ".y")])) | 
+          (!is.na(sca_na[, str_c(v, ".x")]) & is.na(sca_na[, str_c(v, ".y")])),
+        na.rm = T
+      )
+    ) 
+  }
+  
+  # How will RG numbers change as a result? 
+  as.tbl(
+    dbGetQuery(
+      con,
+      "select *
+      from student_ready_grads"
+    )
+  ) %>% 
+    janitor::clean_names() %>% 
+    select(student_key, ready_graduate) %>% 
+    full_join(transmute(rg, student_key, ready_graduate), by = "student_key") %>% 
+    filter(ready_graduate.x == "Y" & ready_graduate.y == "N")
   
   # How many students were ready graduates? Because of ACT only? EPSO only? Both? 
   mutate(filter(rg, ready_graduate == "Y"),
@@ -186,4 +190,61 @@ if(checks) {
     View()
 } else {
   rm(checks)
+}
+
+# Final output
+if(final_output) {
+  # Database pull
+  rg_final = as.tbl(
+    dbGetQuery(
+      con,
+      "select *
+      from student_ready_grads"
+    )
+  ) %>% 
+    janitor::clean_names() %>% 
+    mutate(n_inter_baccalaureate = ifelse(is.na(n_inter_baccalaureate), 0, n_inter_baccalaureate)) %>%
+    rename(n_ap = n_adv_placement, n_ib = n_inter_baccalaureate, n_de = n_dual_enrollment,
+           n_sdc = n_statewide_dual_credit, n_ldc = n_local_dual_credit) %>% 
+    # Join to new calculations
+    full_join(
+      read_csv("ready_graduate_student_level.csv") %>% 
+        select(
+          student_key, starts_with("n_"), ready_graduate
+        ),
+      by = "student_key"
+    ) %>%
+    mutate(
+      n_cambridge = pmax(n_cambridge.x, n_cambridge.y),
+      n_ap = pmax(n_ap.x, n_ap.y),
+      n_ib = pmax(n_ib.x, n_ib.y),
+      n_sdc = pmax(n_sdc.x, n_sdc.y),
+      n_ldc = pmax(n_ldc.x, n_ldc.y),
+      n_de = pmax(n_de.x, n_de.y),
+      ready_graduate = pmax(ready_graduate.x, ready_graduate.y)
+    )
+  
+  # Confirm updates
+  filter(rg_final, ready_graduate.x != ready_graduate.y) %>% 
+    group_by(ready_graduate, ready_graduate.x, ready_graduate.y) %>% 
+    summarize(n = n()) %>% 
+    ungroup()
+  
+  path = str_c(getwd(), "/")
+  file = str_c(domain, "_student_level.csv")
+  
+  if(file %in% list.files(path)) {
+    if(!dir.exists(str_c(path, "Previous"))) {
+      dir.create(str_c(path, "Previous"))
+      dir.create(str_c(path, "Previous/", str_replace_all(now(), "[-:]", "")))
+    }
+    if(!dir.exists(str_c(path, "Previous/", str_replace_all(now(), "[-:]", "")))) {
+      dir.create(str_c(path, "Previous/", str_replace_all(now(), "[-:]", "")))
+    }
+    file.rename(str_c(path, file),
+                str_c(path, "Previous/", str_replace_all(now(), "[-:]", ""), "/", file))
+  }
+  write_csv(rg_final, str_c(path, file), na = "") 
+} else {
+  rm(final_output)
 }
