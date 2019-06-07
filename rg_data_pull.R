@@ -1,6 +1,6 @@
 # Ready Graduate Data Pull
 # Evan Kramer
-# 4/12/2019
+# 5/9/2019
 
 options(java.parameters = "-Xmx16G")
 library(tidyverse)
@@ -98,7 +98,7 @@ for(i in sort(unique(updates$student_key))) {
       str_c(
         "update student_readygrad_docs ",
         "set comments = 'No documentation has been uploaded for this appeal. Please upload documentation by clicking the Attach link or using the Mass Upload feature.' ",
-        "where status in (0, 2, NULL) and student_key = ", i
+        "where status in (0, 2, NULL) and comments is null and student_key = ", i
       ) 
     )
     # dbCommit(con)
@@ -109,41 +109,9 @@ for(i in sort(unique(updates$student_key))) {
       str_c(
         "update student_readygrad_docs ",
         "set comments = 'No data has been uploaded for this appeal. Please upload updated data using the Mass Upload feature.' ",
-        "where status in (0, 2, NULL) and student_key = ", i
+        "where status in (0, 2, NULL) and comments is null and student_key = ", i
       ) 
     )
     # dbCommit(con)
   } 
 }
-
-# Output student-level file for sending emails
-# wb = str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")
-# openxlsx::writeDataTable(
-#   wb = openxlsx::loadWorkbook(str_c(getwd(), "/Code/Incomplete Submission Email Macro.xlsm")),
-#   sheet = 3,
-#   x = select(updates, student_key, ends_with("_no"), n_docs_to_review:n_new_data, status, comments),
-#   rowNames = F
-# )
-# 
-# # Look at archives
-# archive = temp = tibble()
-# setwd("//ca01sdcww00004/inetpub/wwwroot/Cohort/App_Data/RG")
-# for(f in sort(list.files())) {
-#   for(f2 in list.files(f)) {
-#     if(str_detect(f2, ".csv")) {
-#       temp = read_csv(str_c(f, "/", f2)) %>% 
-#         mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
-#     } else if(str_detect(f2, ".xlsx")) {
-#       temp = readxl::read_excel(str_c(f, "/", f2)) %>% 
-#         mutate(file_name = f2, file_datetime = file.mtime(str_c(f, "/", f2)))
-#     }
-#     if("UPLOAD_DATE" %in% names(temp)) {
-#       temp = mutate(temp, UPLOAD_DATE = as_datetime(UPLOAD_DATE))
-#     }
-#     archive = bind_rows(archive, temp)
-#   }
-# }
-# 
-# rm(list = ls(pattern = "f")); rm(temp)
-# (archive)
-# setwd(str_c("N:/ORP_accountability/projects/", year(today()), "_ready_graduate/"))

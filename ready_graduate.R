@@ -222,13 +222,18 @@ if(final_output) {
       n_ldc = pmax(n_ldc.x, n_ldc.y),
       n_de = pmax(n_de.x, n_de.y),
       ready_graduate = pmax(ready_graduate.x, ready_graduate.y)
-    )
+    ) %>% 
+    select(-contains(".x"), -contains(".y"), -is_approved) %>% 
+    select(student_key, first_name, middle_name, last_name, race_ethnicity, cohortyear, el = elb, swd, ed = econ_dis,
+           district_no, school_no, included_in_cohort, sat_math, sat_critical_reading, sat_total, 
+           act_english, act_math, act_reading, act_science, act_composite, industry_cert = industry_cert_earned, asvab, 
+           ncrc_work_keys, n_cambridge, n_ap, n_ib, n_sdc, n_ldc, n_de, clep = participate_clg_lvl_pgm, ready_graduate)
   
   # Confirm updates
-  filter(rg_final, ready_graduate.x != ready_graduate.y) %>% 
-    group_by(ready_graduate, ready_graduate.x, ready_graduate.y) %>% 
-    summarize(n = n()) %>% 
-    ungroup()
+  # filter(rg_final, ready_graduate.x != ready_graduate.y) %>% 
+  #   group_by(ready_graduate, ready_graduate.x, ready_graduate.y) %>% 
+  #   summarize(n = n()) %>% 
+  #   ungroup()
   
   path = str_c(getwd(), "/")
   file = str_c(domain, "_student_level.csv")
