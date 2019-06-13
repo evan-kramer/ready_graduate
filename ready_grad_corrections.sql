@@ -5,7 +5,6 @@ Evan Kramer
 */
 
 /*
-
 -- Test changes
 select * -- count(*)
 from student_ready_grads

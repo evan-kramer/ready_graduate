@@ -104,6 +104,82 @@ if(output) {
 
 # Checks
 if(checks) {
+  # Students whose values have changed
+  mismatches = as.tbl(
+    dbGetQuery(
+      dbConnect(
+        JDBC("oracle.jdbc.OracleDriver", classPath="C:/Users/CA19130/Downloads/ojdbc6.jar"), 
+        readRegistry("Environment", hive = "HCU")$EIS_MGR_CXN_STR[1],
+        "EIS_MGR", 
+        readRegistry("Environment", hive = "HCU")$EIS_MGR_PWD[1] 
+      ),
+      "select *
+      from student_ready_grads"
+    )
+  ) %>% 
+    janitor::clean_names() %>% 
+    full_join(
+      read_csv(str_c("N:/ORP_accountability/projects/", year(now()), "_ready_graduate/Data/ready_graduate_student_level.csv")),
+      by = c("student_key", "first_name", "middle_name", "last_name", "race_ethnicity", "cohortyear", "elb",
+             "swd", "econ_dis", "district_no", "school_no", "included_in_cohort", "completion_type")
+    ) %>% 
+    select(
+      student_key:completion_type, is_approved,
+      starts_with("act_english"),
+      starts_with("act_math"),
+      starts_with("act_reading"),
+      starts_with("act_science"),
+      starts_with("act_composite"),
+      starts_with("industry_cert"),
+      starts_with("asvab"),
+      starts_with("participate_cl"),
+      starts_with("act_english"),
+      starts_with("n_cambridge"),
+      n_adv_placement, n_ap,
+      n_inter_baccalaureate, n_ib,
+      n_statewide_dual_credit, n_sdc,
+      n_local_dual_credit, n_ldc,
+      n_dual_enrollment, n_de
+    )
+  
+  
+    filter(mismatches, !is.na(is_approved)) %>% 
+      mutate_at(vars(act_english.x:n_de), funs(ifelse(is.na(.), 0, .))) %>% 
+      transmute(
+        student_key,
+        first_name, 
+        middle_name,
+        last_name,
+        race_ethnicity, 
+        cohortyear,
+        elb,
+        swd,
+        econ_dis,
+        district_no,
+        school_no,
+        included_in_cohort,
+        completion_type,
+        udpated_act_english = act_english.y != act_english.x,
+        updated_act_math = act_math.y != act_math.x,
+        updated_act_reading = act_reading.y != act_reading.x,
+        updated_act_science = act_science.y != act_science.x,
+        updated_act_composite = act_composite.y != act_composite.x,
+        updated_industry_cert = industry_cert_earned.y != industry_cert_earned.x,
+        updated_asvab = asvab.y != asvab.x,
+        updated_clep = participate_clg_lvl_pgm.y != participate_clg_lvl_pgm.x,
+        updated_cambridge = n_cambridge.y != n_cambridge.x,
+        updated_ap = n_ap != n_adv_placement,
+        updated_ib = n_ib != n_inter_baccalaureate,
+        updated_sdc = n_sdc != n_statewide_dual_credit,
+        updated_ldc = n_ldc != n_local_dual_credit,
+        updated_de = n_de != n_dual_enrollment
+      ) %>% 
+      filter_at(vars(starts_with("updated")), any_vars(. == T)) %>% 
+      select(everything()) 
+      write_csv("changed_data_v2.csv", na = "")
+  
+  
+  
   # Missing sca_end_date
   # Current file (from database)
   sca_na = as.tbl(

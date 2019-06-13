@@ -84,34 +84,34 @@ read_csv("N:/ORP_accountability/data/2018_final_accountability_files/system_name
   write_csv(str_c(getwd(), "/Documentation for Reviewers/Status Updates/status_update_", today(), ".csv"), na = "")
 
 # Make database updates
-dbSendUpdate(
-  con,
-  "update student_readygrad_docs
-  set comments = NULL 
-  where status is null and comments is not null"
-)
-for(i in sort(unique(updates$student_key))) {
-  if(updates$n_data_no_doc[updates$student_key == i]) {
-    # No documentation
-    dbSendUpdate(
-      con,
-      str_c(
-        "update student_readygrad_docs ",
-        "set comments = 'No documentation has been uploaded for this appeal. Please upload documentation by clicking the Attach link or using the Mass Upload feature.' ",
-        "where status in (0, 2, NULL) and comments is null and student_key = ", i
-      ) 
-    )
-    # dbCommit(con)
-  } else if(updates$n_doc_no_data[updates$student_key == i]) {
-    # No data    
-    dbSendUpdate(
-      con,
-      str_c(
-        "update student_readygrad_docs ",
-        "set comments = 'No data has been uploaded for this appeal. Please upload updated data using the Mass Upload feature.' ",
-        "where status in (0, 2, NULL) and comments is null and student_key = ", i
-      ) 
-    )
-    # dbCommit(con)
-  } 
-}
+# dbSendUpdate(
+#   con,
+#   "update student_readygrad_docs
+#   set comments = NULL 
+#   where status is null and comments is not null"
+# )
+# for(i in sort(unique(updates$student_key))) {
+#   if(updates$n_data_no_doc[updates$student_key == i]) {
+#     # No documentation
+#     dbSendUpdate(
+#       con,
+#       str_c(
+#         "update student_readygrad_docs ",
+#         "set comments = 'No documentation has been uploaded for this appeal. Please upload documentation by clicking the Attach link or using the Mass Upload feature.' ",
+#         "where status in (0, 2, NULL) and comments is null and student_key = ", i
+#       ) 
+#     )
+#     # dbCommit(con)
+#   } else if(updates$n_doc_no_data[updates$student_key == i]) {
+#     # No data    
+#     dbSendUpdate(
+#       con,
+#       str_c(
+#         "update student_readygrad_docs ",
+#         "set comments = 'No data has been uploaded for this appeal. Please upload updated data using the Mass Upload feature.' ",
+#         "where status in (0, 2, NULL) and comments is null and student_key = ", i
+#       ) 
+#     )
+#     # dbCommit(con)
+#   } 
+# }
