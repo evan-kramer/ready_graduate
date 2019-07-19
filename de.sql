@@ -43,3 +43,21 @@ on (
     courses.school_bu_id = instructional_days.school_bu_id and
     courses.isp_school_year = instructional_days.school_year
 );
+
+/*
+select count(distinct student_key)
+from class_section
+inner join student_class_assignment
+using (school_year, school_bu_id, instructional_program_num)
+inner join post_secondary_sch_list psl on post_secondary_institution = psl.school_code
+where school_year = extract(year from sysdate) - 1 and 
+    course_code in (
+        4000,4001,4002,4003,4004,4005,4006,4007,4008,4009,4010,4011,4012,4013,4014,4015,4016,4017,4018,4019,4020,
+        4021,4022,4023,4024,4025,4026,4027,4028,4029,4030,4031,4032,4033,4034,4035,4036,4037,4038,4039,4040,4041,
+        4042,4043,4044,4045,4046,4047,4048,4049,4050,4051,4052,4053,4054,4055,4056,4057,4058,4059,4060,4061,4062,
+        4063,4064,4065,4066,4067,4068,4069,4070,4071,4072,4073,4074,4075,4076,4077,4078,4079,4080,4081,4082,4083,
+        4084,4085,4086,4087,4088,4089,4090,4091,4092,4093,4094,4095,4096,4097,4098,4099,4100,4101,4102,4103,4104,
+        4105,4106,4107,4108,4109,4110,4111,4112,4113,4114,4115,4116,4117,4118,4119,4120,4121,4122,4123,4124,4125,
+        4126,4127,4128,4129,4130,4131,4132,4133,4266,4267,4268,4272,4273,4274,4272,4273,4274,6189,6190,6191,6192
+    ) and 
+    school_name like '%COMMUNITY COLLEGE%';

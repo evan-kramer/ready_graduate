@@ -135,7 +135,7 @@ if(clean == T) {
       arrange(isp_id, student_key) %>%
       group_by(isp_id, student_key, course_code, begin_date, end_date, sca_begin_date, sca_end_date,
                cs_begin_date, cs_end_date) %>%
-      # SUm course and enrolled instructional days by course code, all begin and end dates
+      # Sum course and enrolled instructional days by course code, all begin and end dates
       summarize(first_name = first(first_name), middle_name = first(middle_name), last_name = first(last_name),
                 date_of_birth = first(date_of_birth), type_of_service = first(type_of_service),
                 isp_school_year = first(isp_school_year), withdrawal_reason = first(withdrawal_reason),
