@@ -47,7 +47,7 @@ The list below details the purpose of each script in this repository.
 - [`app_checks.R`](https://github.com/evan-kramer/ready_graduate/blob/master/app_checks.R)
 	- __Purpose__: Confirm that business rules are being applied correctly to the data in the Cohort application (e.g., that 4 early postsecondary opportunities make a student a Ready Graduate)
 	- __Frequency__: Before and after each data release and as needed
-- [`cambridge.R`](https://github.com/evan-kramer/ready_graduate/blob/master/cambridge.Rhttps://github.com/evan-kramer/ready_graduate/blob/master/cambridge.R)
+- [`cambridge.R`](https://github.com/evan-kramer/ready_graduate/blob/master/cambridge.R)
 	- __Purpose__: Prepare Cambridge course enrollment and exam data
 	- __Frequency__: When source files are complete (typically November) and as needed afterwards to correct
 - [`clep.R`](https://github.com/evan-kramer/ready_graduate/blob/master/clep.R)
